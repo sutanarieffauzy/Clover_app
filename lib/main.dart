@@ -8,12 +8,11 @@ void main() {
 class CloverApp extends StatelessWidget {
   const CloverApp({super.key});
 
-  // Skema Warna Soft & Comforting
-  static const Color bgDark = Color(0xFF14191D);       // Dark Slate Lembut
-  static const Color surfaceDark = Color(0xFF1E252B);  // Abu-abu Kebiruan Redup
-  static const Color primaryMint = Color(0xFF38EF7D);  // Hijau Mint Teduh
-  static const Color myBubbleBg = Color(0xFF1B4D3E);   // Hijau Sage Gelap
-  static const Color amberSoft = Color(0xFFE6A23C);    // Amber Soft untuk 1x lihat
+  static const Color bgDark = Color(0xFF14191D);
+  static const Color surfaceDark = Color(0xFF1E252B);
+  static const Color primaryMint = Color(0xFF38EF7D);
+  static const Color myBubbleBg = Color(0xFF1B4D3E);
+  static const Color amberSoft = Color(0xFFE6A23C);
 
   @override
   Widget build(BuildContext context) {
@@ -90,7 +89,15 @@ class ChatListTab extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Clover Messages'),
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.search, color: Colors.white70)),
+          IconButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Fitur pencarian pesan dibuka')),
+              );
+            },
+            icon: const Icon(Icons.search, color: Colors.white70),
+            tooltip: 'Cari Chat',
+          ),
         ],
       ),
       body: ListView(
@@ -101,7 +108,7 @@ class ChatListTab extends StatelessWidget {
               child: Icon(Icons.person, color: CloverApp.bgDark),
             ),
             title: const Text('Alex (Developer)', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
-            subtitle: const Text('Klik untuk buka percakapan', style: TextStyle(color: Colors.white38, fontSize: 13)),
+            subtitle: const Text('Tekan lama pesan untuk menghapus', style: TextStyle(color: Colors.white38, fontSize: 13)),
             trailing: const Text('10:42 AM', style: TextStyle(color: Colors.white38, fontSize: 11)),
             onTap: () {
               Navigator.push(
@@ -156,6 +163,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     await prefs.setStringList('messages_${widget.userName}', _savedMessages);
   }
 
+  Future<void> _deleteMessage(int index) async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _savedMessages.removeAt(index);
+    });
+    await prefs.setStringList('messages_${widget.userName}', _savedMessages);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -185,30 +200,72 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
                 return Align(
                   alignment: Alignment.centerRight,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isViewOnce ? CloverApp.amberSoft.withValues(alpha: 0.15) : CloverApp.myBubbleBg,
-                      borderRadius: BorderRadius.circular(14),
-                      border: isViewOnce ? Border.all(color: CloverApp.amberSoft.withValues(alpha: 0.5)) : null,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (isViewOnce) ...[
-                          const Icon(Icons.filter_1_rounded, size: 16, color: CloverApp.amberSoft),
-                          const SizedBox(width: 6),
-                        ],
-                        Text(
-                          msgText,
-                          style: TextStyle(
-                            color: isViewOnce ? CloverApp.amberSoft : Colors.white.withValues(alpha: 0.9),
-                            fontWeight: FontWeight.w400,
-                            fontSize: 14,
-                          ),
+                  child: GestureDetector(
+                    onLongPress: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          backgroundColor: CloverApp.surfaceDark,
+                          title: const Text('Hapus Pesan?'),
+                          content: const Text('Pesan ini akan dihapus dari obrolan.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Batal', style: TextStyle(color: Colors.white54)),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(ctx);
+                                _deleteMessage(index);
+                              },
+                              child: const Text('Hapus', style: TextStyle(color: Colors.redAccent)),
+                            ),
+                          ],
                         ),
-                      ],
+                      );
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isViewOnce ? CloverApp.amberSoft.withValues(alpha: 0.15) : CloverApp.myBubbleBg,
+                        borderRadius: BorderRadius.circular(14),
+                        border: isViewOnce ? Border.all(color: CloverApp.amberSoft.withValues(alpha: 0.5)) : null,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAlignment.end,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isViewOnce) ...[
+                                const Icon(Icons.filter_1_rounded, size: 16, color: CloverApp.amberSoft),
+                                const SizedBox(width: 6),
+                              ],
+                              Text(
+                                msgText,
+                                style: TextStyle(
+                                  color: isViewOnce ? CloverApp.amberSoft : Colors.white.withValues(alpha: 0.9),
+                                  fontWeight: FontWeight.w400,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Text(
+                                '10:42',
+                                style: TextStyle(color: Colors.white38, fontSize: 10),
+                              ),
+                              SizedBox(width: 4),
+                              Icon(Icons.done_all_rounded, size: 14, color: CloverApp.primaryMint),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
