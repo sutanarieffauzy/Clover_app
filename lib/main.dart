@@ -82,8 +82,47 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
   }
 }
 
-class ChatListTab extends StatelessWidget {
+class ChatListTab extends StatefulWidget {
   const ChatListTab({super.key});
+
+  @override
+  State<ChatListTab> createState() => _ChatListTabState();
+}
+
+class _ChatListTabState extends State<ChatListTab> {
+  List<String> _chatUsers = ['Alex (Developer)'];
+  Map<String, String> _lastMessages = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadChatList();
+  }
+
+  Future<void> _loadChatList() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedUsers = prefs.getStringList('active_chat_users') ?? ['Alex (Developer)'];
+    
+    Map<String, String> tempLastMsg = {};
+    for (String user in savedUsers) {
+      final msgs = prefs.getStringList('messages_$user') ?? [];
+      if (msgs.isNotEmpty) {
+        final last = msgs.last;
+        if (last.startsWith('📷 [VIEW_ONCE_IMG]:')) {
+          tempLastMsg[user] = '📷 Foto 1x Lihat';
+        } else {
+          tempLastMsg[user] = last;
+        }
+      } else {
+        tempLastMsg[user] = 'Belum ada pesan';
+      }
+    }
+
+    setState(() {
+      _chatUsers = savedUsers;
+      _lastMessages = tempLastMsg;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -91,24 +130,40 @@ class ChatListTab extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Clover Messages'),
       ),
-      body: ListView(
-        children: [
-          ListTile(
-            leading: const CircleAvatar(
-              backgroundColor: CloverApp.primaryMint,
-              child: Icon(Icons.person, color: CloverApp.bgDark),
-            ),
-            title: const Text('Alex (Developer)', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
-            subtitle: const Text('Ketuk untuk membuka obrolan', style: TextStyle(color: Colors.white38, fontSize: 13)),
-            trailing: const Text('10:42 AM', style: TextStyle(color: Colors.white38, fontSize: 11)),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ChatDetailScreen(userName: 'Alex')),
-              );
-            },
-          ),
-        ],
+      body: RefreshIndicator(
+        onRefresh: _loadChatList,
+        child: ListView.builder(
+          itemCount: _chatUsers.length,
+          itemBuilder: (context, index) {
+            final userName = _chatUsers[index];
+            final lastMsg = _lastMessages[userName] ?? 'Ketuk untuk membuka obrolan';
+
+            return ListTile(
+              leading: CircleAvatar(
+                backgroundColor: CloverApp.primaryMint.withValues(alpha: 0.2),
+                child: Text(
+                  userName[0].toUpperCase(),
+                  style: const TextStyle(color: CloverApp.primaryMint, fontWeight: FontWeight.bold),
+                ),
+              ),
+              title: Text(userName, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
+              subtitle: Text(
+                lastMsg,
+                style: const TextStyle(color: Colors.white38, fontSize: 13),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              trailing: const Icon(Icons.chevron_right, color: Colors.white24, size: 18),
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ChatDetailScreen(userName: userName)),
+                );
+                _loadChatList();
+              },
+            );
+          },
+        ),
       ),
     );
   }
@@ -147,12 +202,21 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     if (text.isEmpty) return;
     
     final prefs = await SharedPreferences.getInstance();
+    
+    // Simpan ke riwayat pesan
+    _savedMessages.add(text);
+    await prefs.setStringList('messages_${widget.userName}', _savedMessages);
+
+    // Tambahkan pengguna ke daftar chat utama jika belum ada
+    List<String> activeUsers = prefs.getStringList('active_chat_users') ?? ['Alex (Developer)'];
+    if (!activeUsers.contains(widget.userName)) {
+      activeUsers.add(widget.userName);
+      await prefs.setStringList('active_chat_users', activeUsers);
+    }
+
     setState(() {
-      _savedMessages.add(text);
       if (customText == null) _msgController.clear();
     });
-    
-    await prefs.setStringList('messages_${widget.userName}', _savedMessages);
   }
 
   Future<void> _pickAndSendImage() async {
@@ -330,11 +394,20 @@ class NearbyTab extends StatelessWidget {
                   backgroundColor: CloverApp.myBubbleBg,
                   foregroundColor: CloverApp.primaryMint,
                 ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => ChatDetailScreen(userName: user['name']!)),
-                  );
+                onPressed: () async {
+                  final prefs = await SharedPreferences.getInstance();
+                  List<String> activeUsers = prefs.getStringList('active_chat_users') ?? ['Alex (Developer)'];
+                  if (!activeUsers.contains(user['name'])) {
+                    activeUsers.add(user['name']!);
+                    await prefs.setStringList('active_chat_users', activeUsers);
+                  }
+
+                  if (context.mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => ChatDetailScreen(userName: user['name']!)),
+                    );
+                  }
                 },
                 child: const Text('Sapa'),
               ),
