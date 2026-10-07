@@ -8,6 +8,13 @@ void main() {
 class CloverApp extends StatelessWidget {
   const CloverApp({super.key});
 
+  // Skema Warna Soft & Comforting
+  static const Color bgDark = Color(0xFF14191D);       // Dark Slate Lembut
+  static const Color surfaceDark = Color(0xFF1E252B);  // Abu-abu Kebiruan Redup
+  static const Color primaryMint = Color(0xFF38EF7D);  // Hijau Mint Teduh
+  static const Color myBubbleBg = Color(0xFF1B4D3E);   // Hijau Sage Gelap
+  static const Color amberSoft = Color(0xFFE6A23C);    // Amber Soft untuk 1x lihat
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -16,15 +23,16 @@ class CloverApp extends StatelessWidget {
       themeMode: ThemeMode.dark,
       darkTheme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF121212),
-        primaryColor: const Color(0xFF00E676),
+        scaffoldBackgroundColor: bgDark,
+        primaryColor: primaryMint,
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF1E1E1E),
+          backgroundColor: surfaceDark,
           elevation: 0,
+          titleTextStyle: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white70),
         ),
         colorScheme: const ColorScheme.dark(
-          primary: Color(0xFF00E676),
-          surface: Color(0xFF1E1E1E),
+          primary: primaryMint,
+          surface: surfaceDark,
         ),
       ),
       home: const MainHomeScreen(),
@@ -54,19 +62,20 @@ class _MainHomeScreenState extends State<MainHomeScreen> {
       body: _pages[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        selectedItemColor: const Color(0xFF00E676),
-        unselectedItemColor: Colors.grey,
-        backgroundColor: const Color(0xFF1E1E1E),
+        selectedItemColor: CloverApp.primaryMint,
+        unselectedItemColor: Colors.white38,
+        backgroundColor: CloverApp.surfaceDark,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), activeIcon: Icon(Icons.chat_bubble), label: 'Chat'),
+          BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people), label: 'Nearby'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profile'),
+        ],
         onTap: (index) {
           setState(() {
             _currentIndex = index;
           });
         },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
-          BottomNavigationBarItem(icon: Icon(Icons.people), label: 'Nearby'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
       ),
     );
   }
@@ -81,19 +90,19 @@ class ChatListTab extends StatelessWidget {
       appBar: AppBar(
         title: const Text('Clover Messages'),
         actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.search)),
+          IconButton(onPressed: () {}, icon: const Icon(Icons.search, color: Colors.white70)),
         ],
       ),
       body: ListView(
         children: [
           ListTile(
             leading: const CircleAvatar(
-              backgroundColor: Color(0xFF00E676),
-              child: Icon(Icons.person, color: Colors.black),
+              backgroundColor: CloverApp.primaryMint,
+              child: Icon(Icons.person, color: CloverApp.bgDark),
             ),
-            title: const Text('Alex (Developer)', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: const Text('Pesan 1x lihat terkirim'),
-            trailing: const Text('10:42 AM', style: TextStyle(color: Colors.grey, fontSize: 12)),
+            title: const Text('Alex (Developer)', style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
+            subtitle: const Text('Klik untuk buka percakapan', style: TextStyle(color: Colors.white38, fontSize: 13)),
+            trailing: const Text('10:42 AM', style: TextStyle(color: Colors.white38, fontSize: 11)),
             onTap: () {
               Navigator.push(
                 context,
@@ -150,26 +159,56 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.userName)),
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            const CircleAvatar(
+              radius: 16,
+              backgroundColor: CloverApp.primaryMint,
+              child: Icon(Icons.person, size: 18, color: CloverApp.bgDark),
+            ),
+            const SizedBox(width: 10),
+            Text(widget.userName, style: const TextStyle(fontSize: 16)),
+          ],
+        ),
+      ),
       body: Column(
         children: [
           Expanded(
             child: ListView.builder(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               itemCount: _savedMessages.length,
               itemBuilder: (context, index) {
+                final msgText = _savedMessages[index];
+                final isViewOnce = msgText.contains('1x Lihat');
+
                 return Align(
                   alignment: Alignment.centerRight,
                   child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00E676),
-                      borderRadius: BorderRadius.circular(12),
+                      color: isViewOnce ? CloverApp.amberSoft.withValues(alpha: 0.15) : CloverApp.myBubbleBg,
+                      borderRadius: BorderRadius.circular(14),
+                      border: isViewOnce ? Border.all(color: CloverApp.amberSoft.withValues(alpha: 0.5)) : null,
                     ),
-                    child: Text(
-                      _savedMessages[index],
-                      style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w500),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isViewOnce) ...[
+                          const Icon(Icons.filter_1_rounded, size: 16, color: CloverApp.amberSoft),
+                          const SizedBox(width: 6),
+                        ],
+                        Text(
+                          msgText,
+                          style: TextStyle(
+                            color: isViewOnce ? CloverApp.amberSoft : Colors.white.withValues(alpha: 0.9),
+                            fontWeight: FontWeight.w400,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -177,25 +216,36 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            color: const Color(0xFF1E1E1E),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            color: CloverApp.surfaceDark,
             child: Row(
               children: [
                 IconButton(
-                  icon: const Icon(Icons.filter_1, color: Color(0xFF00E676)),
+                  icon: const Icon(Icons.filter_1_rounded, color: CloverApp.amberSoft),
                   onPressed: () => _sendMessage(type: 'view_once'),
+                  tooltip: 'Pesan 1x Lihat',
                 ),
                 Expanded(
-                  child: TextField(
-                    controller: _msgController,
-                    decoration: const InputDecoration(
-                      hintText: 'Ketik pesan...',
-                      border: InputBorder.none,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: CloverApp.bgDark,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: TextField(
+                      controller: _msgController,
+                      style: const TextStyle(color: Colors.white, fontSize: 14),
+                      decoration: const InputDecoration(
+                        hintText: 'Ketik pesan...',
+                        hintStyle: TextStyle(color: Colors.white38, fontSize: 14),
+                        border: InputBorder.none,
+                      ),
                     ),
                   ),
                 ),
+                const SizedBox(width: 6),
                 IconButton(
-                  icon: const Icon(Icons.send, color: Color(0xFF00E676)),
+                  icon: const Icon(Icons.send_rounded, color: CloverApp.primaryMint),
                   onPressed: () => _sendMessage(),
                 ),
               ],
@@ -215,7 +265,7 @@ class NearbyTab extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Teman Sekitar')),
       body: const Center(
-        child: Text('Fitur Lokasi / Nearby Aktif', style: TextStyle(color: Colors.grey)),
+        child: Text('Fitur Lokasi / Nearby Aktif', style: TextStyle(color: Colors.white38)),
       ),
     );
   }
@@ -234,12 +284,13 @@ class ProfileTab extends StatelessWidget {
           children: const [
             CircleAvatar(
               radius: 40,
-              backgroundColor: Color(0xFF00E676),
-              child: Icon(Icons.person, size: 50, color: Colors.black),
+              backgroundColor: CloverApp.primaryMint,
+              child: Icon(Icons.person, size: 50, color: CloverApp.bgDark),
             ),
             SizedBox(height: 12),
-            Text('Sutan Arief Fauzy', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text('User Clover App', style: TextStyle(color: Colors.grey)),
+            Text('Sutan Arief Fauzy', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            SizedBox(height: 4),
+            Text('User Clover App', style: TextStyle(color: Colors.white38)),
           ],
         ),
       ),
