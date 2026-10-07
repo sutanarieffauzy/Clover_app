@@ -36,7 +36,209 @@ class CloverApp extends StatelessWidget {
           surface: surfaceDark,
         ),
       ),
-      home: const MainHomeScreen(),
+      home: const AuthCheckScreen(),
+    );
+  }
+}
+
+class AuthCheckScreen extends StatefulWidget {
+  const AuthCheckScreen({super.key});
+
+  @override
+  State<AuthCheckScreen> createState() => _AuthCheckScreenState();
+}
+
+class _AuthCheckScreenState extends State<AuthCheckScreen> {
+  bool _isLoggedIn = false;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final loggedIn = prefs.getBool('is_logged_in') ?? false;
+    setState(() {
+      _isLoggedIn = loggedIn;
+      _isLoading = false;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: CloverApp.primaryMint)),
+      );
+    }
+    return _isLoggedIn ? const MainHomeScreen() : const LoginScreen();
+  }
+}
+
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  bool _isRegisterMode = false;
+  final _emailCtrl = TextEditingController();
+  final _passCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
+
+  Future<void> _submitAuth() async {
+    final email = _emailCtrl.text.trim();
+    final pass = _passCtrl.text.trim();
+    final name = _nameCtrl.text.trim();
+
+    if (email.isEmpty || pass.isEmpty || (_isRegisterMode && name.isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Harap isi semua kolom!')),
+      );
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+
+    if (_isRegisterMode) {
+      await prefs.setString('user_email', email);
+      await prefs.setString('user_pass', pass);
+      await prefs.setString('user_name', name);
+      await prefs.setString('user_bio', 'Pengguna Baru Clover');
+      await prefs.setBool('is_logged_in', true);
+    } else {
+      final savedEmail = prefs.getString('user_email');
+      final savedPass = prefs.getString('user_pass');
+
+      if (savedEmail != null && email == savedEmail && pass == savedPass) {
+        await prefs.setBool('is_logged_in', true);
+      } else if (savedEmail == null) {
+        // Pendaftaran pertama jika belum pernah ada akun tersimpan
+        await prefs.setString('user_email', email);
+        await prefs.setString('user_pass', pass);
+        await prefs.setString('user_name', email.split('@')[0]);
+        await prefs.setString('user_bio', 'Member Clover');
+        await prefs.setBool('is_logged_in', true);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Email atau kata sandi salah!')),
+          );
+        }
+        return;
+      }
+    }
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const MainHomeScreen()),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+          child: Center(
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.chat_bubble, size: 70, color: CloverApp.primaryMint),
+                  const SizedBox(height: 12),
+                  Text(
+                    _isRegisterMode ? 'Buat Akun Clover' : 'Selamat Datang',
+                    style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    _isRegisterMode ? 'Daftar untuk mulai berkirim pesan' : 'Masuk ke akun Clover kamu',
+                    style: const TextStyle(color: Colors.white54, fontSize: 14),
+                  ),
+                  const SizedBox(height: 30),
+                  if (_isRegisterMode) ...[
+                    TextField(
+                      controller: _nameCtrl,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: InputDecoration(
+                        labelText: 'Nama Lengkap',
+                        prefixIcon: const Icon(Icons.person, color: CloverApp.primaryMint),
+                        filled: true,
+                        fillColor: CloverApp.surfaceDark,
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  TextField(
+                    controller: _emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Email / Username',
+                      prefixIcon: const Icon(Icons.email, color: CloverApp.primaryMint),
+                      filled: true,
+                      fillColor: CloverApp.surfaceDark,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _passCtrl,
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: InputDecoration(
+                      labelText: 'Kata Sandi',
+                      prefixIcon: const Icon(Icons.lock, color: CloverApp.primaryMint),
+                      filled: true,
+                      fillColor: CloverApp.surfaceDark,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: CloverApp.primaryMint,
+                        foregroundColor: CloverApp.bgDark,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _submitAuth,
+                      child: Text(
+                        _isRegisterMode ? 'Daftar Sekarang' : 'Masuk',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _isRegisterMode = !_isRegisterMode;
+                      });
+                    },
+                    child: Text(
+                      _isRegisterMode ? 'Sudah punya akun? Masuk' : 'Belum punya akun? Daftar di sini',
+                      style: const TextStyle(color: CloverApp.primaryMint),
+                    ),
+                  )
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -203,11 +405,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     
     final prefs = await SharedPreferences.getInstance();
     
-    // Simpan ke riwayat pesan
     _savedMessages.add(text);
     await prefs.setStringList('messages_${widget.userName}', _savedMessages);
 
-    // Tambahkan pengguna ke daftar chat utama jika belum ada
     List<String> activeUsers = prefs.getStringList('active_chat_users') ?? ['Alex (Developer)'];
     if (!activeUsers.contains(widget.userName)) {
       activeUsers.add(widget.userName);
@@ -429,6 +629,7 @@ class ProfileTab extends StatefulWidget {
 class _ProfileTabState extends State<ProfileTab> {
   String _name = 'Sutan Arief Fauzy';
   String _bio = 'Driver BangKurir | Flutter Dev';
+  String _email = '';
   String? _profileImagePath;
   final ImagePicker _picker = ImagePicker();
 
@@ -443,6 +644,7 @@ class _ProfileTabState extends State<ProfileTab> {
     setState(() {
       _name = prefs.getString('user_name') ?? 'Sutan Arief Fauzy';
       _bio = prefs.getString('user_bio') ?? 'Driver BangKurir | Flutter Dev';
+      _email = prefs.getString('user_email') ?? 'sutan@clover.app';
       _profileImagePath = prefs.getString('user_profile_img');
     });
   }
@@ -455,6 +657,17 @@ class _ProfileTabState extends State<ProfileTab> {
       setState(() {
         _profileImagePath = image.path;
       });
+    }
+  }
+
+  Future<void> _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('is_logged_in', false);
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
     }
   }
 
@@ -510,49 +723,69 @@ class _ProfileTabState extends State<ProfileTab> {
     return Scaffold(
       appBar: AppBar(title: const Text('Profil Saya')),
       body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: _pickProfileImage,
-              child: Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: CloverApp.primaryMint,
-                    backgroundImage: _profileImagePath != null ? FileImage(File(_profileImagePath!)) : null,
-                    child: _profileImagePath == null
-                        ? const Icon(Icons.person, size: 60, color: CloverApp.bgDark)
-                        : null,
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: CircleAvatar(
-                      radius: 16,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              GestureDetector(
+                onTap: _pickProfileImage,
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 50,
                       backgroundColor: CloverApp.primaryMint,
-                      child: const Icon(Icons.camera_alt, size: 16, color: CloverApp.bgDark),
+                      backgroundImage: _profileImagePath != null ? FileImage(File(_profileImagePath!)) : null,
+                      child: _profileImagePath == null
+                          ? const Icon(Icons.person, size: 60, color: CloverApp.bgDark)
+                          : null,
                     ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: CircleAvatar(
+                        radius: 16,
+                        backgroundColor: CloverApp.primaryMint,
+                        child: const Icon(Icons.camera_alt, size: 16, color: CloverApp.bgDark),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(_name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              const SizedBox(height: 4),
+              Text(_email, style: const TextStyle(color: CloverApp.primaryMint, fontSize: 13)),
+              const SizedBox(height: 6),
+              Text(_bio, style: const TextStyle(color: Colors.white54, fontSize: 14)),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CloverApp.surfaceDark,
+                      foregroundColor: CloverApp.primaryMint,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onPressed: _editProfileDialog,
+                    icon: const Icon(Icons.edit, size: 18),
+                    label: const Text('Edit Profil'),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent.withValues(alpha: 0.2),
+                      foregroundColor: Colors.redAccent,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onPressed: _logout,
+                    icon: const Icon(Icons.logout, size: 18),
+                    label: const Text('Keluar'),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(_name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-            const SizedBox(height: 6),
-            Text(_bio, style: const TextStyle(color: Colors.white54, fontSize: 14)),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: CloverApp.surfaceDark,
-                foregroundColor: CloverApp.primaryMint,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-              onPressed: _editProfileDialog,
-              icon: const Icon(Icons.edit, size: 18),
-              label: const Text('Edit Data Profil'),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
