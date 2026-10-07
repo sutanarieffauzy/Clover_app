@@ -233,7 +233,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         border: isViewOnce ? Border.all(color: CloverApp.amberSoft.withValues(alpha: 0.5)) : null,
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
                           Row(
                             mainAxisSize: MainAxisSize.min,
