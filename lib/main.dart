@@ -118,7 +118,6 @@ class _LoginScreenState extends State<LoginScreen> {
       if (savedEmail != null && email == savedEmail && pass == savedPass) {
         await prefs.setBool('is_logged_in', true);
       } else if (savedEmail == null) {
-        // Pendaftaran pertama jika belum pernah ada akun tersimpan
         await prefs.setString('user_email', email);
         await prefs.setString('user_pass', pass);
         await prefs.setString('user_name', email.split('@')[0]);
@@ -304,7 +303,7 @@ class _ChatListTabState extends State<ChatListTab> {
   Future<void> _loadChatList() async {
     final prefs = await SharedPreferences.getInstance();
     final savedUsers = prefs.getStringList('active_chat_users') ?? ['Alex (Developer)'];
-    
+
     Map<String, String> tempLastMsg = {};
     for (String user in savedUsers) {
       final msgs = prefs.getStringList('messages_$user') ?? [];
@@ -334,38 +333,42 @@ class _ChatListTabState extends State<ChatListTab> {
       ),
       body: RefreshIndicator(
         onRefresh: _loadChatList,
-        child: ListView.builder(
-          itemCount: _chatUsers.length,
-          itemBuilder: (context, index) {
-            final userName = _chatUsers[index];
-            final lastMsg = _lastMessages[userName] ?? 'Ketuk untuk membuka obrolan';
+        child: _chatUsers.isEmpty
+            ? const Center(
+                child: Text('Belum ada pertemanan/chat aktif.', style: TextStyle(color: Colors.white38)),
+              )
+            : ListView.builder(
+                itemCount: _chatUsers.length,
+                itemBuilder: (context, index) {
+                  final userName = _chatUsers[index];
+                  final lastMsg = _lastMessages[userName] ?? 'Ketuk untuk membuka obrolan';
 
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundColor: CloverApp.primaryMint.withValues(alpha: 0.2),
-                child: Text(
-                  userName[0].toUpperCase(),
-                  style: const TextStyle(color: CloverApp.primaryMint, fontWeight: FontWeight.bold),
-                ),
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: CloverApp.primaryMint.withValues(alpha: 0.2),
+                      child: Text(
+                        userName[0].toUpperCase(),
+                        style: const TextStyle(color: CloverApp.primaryMint, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    title: Text(userName, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
+                    subtitle: Text(
+                      lastMsg,
+                      style: const TextStyle(color: Colors.white38, fontSize: 13),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    trailing: const Icon(Icons.chevron_right, color: Colors.white24, size: 18),
+                    onTap: () async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ChatDetailScreen(userName: userName)),
+                      );
+                      _loadChatList();
+                    },
+                  );
+                },
               ),
-              title: Text(userName, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
-              subtitle: Text(
-                lastMsg,
-                style: const TextStyle(color: Colors.white38, fontSize: 13),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              trailing: const Icon(Icons.chevron_right, color: Colors.white24, size: 18),
-              onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ChatDetailScreen(userName: userName)),
-                );
-                _loadChatList();
-              },
-            );
-          },
-        ),
       ),
     );
   }
@@ -383,16 +386,20 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   final TextEditingController _msgController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
   List<String> _savedMessages = [];
+  bool _isBlocked = false;
 
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    _loadChatData();
   }
 
-  Future<void> _loadMessages() async {
+  Future<void> _loadChatData() async {
     final prefs = await SharedPreferences.getInstance();
+    final blockedList = prefs.getStringList('blocked_users') ?? [];
+
     setState(() {
+      _isBlocked = blockedList.contains(widget.userName);
       _savedMessages = prefs.getStringList('messages_${widget.userName}') ?? [
         'Halo, selamat datang di Clover!'
       ];
@@ -400,11 +407,18 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _sendMessage({String? customText}) async {
+    if (_isBlocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Anda membokir pengguna ini. Buka blokir untuk mengirim pesan.')),
+      );
+      return;
+    }
+
     final text = customText ?? _msgController.text.trim();
     if (text.isEmpty) return;
-    
+
     final prefs = await SharedPreferences.getInstance();
-    
+
     _savedMessages.add(text);
     await prefs.setStringList('messages_${widget.userName}', _savedMessages);
 
@@ -420,6 +434,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   }
 
   Future<void> _pickAndSendImage() async {
+    if (_isBlocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Anda membokir pengguna ini.')),
+      );
+      return;
+    }
     final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
     if (image != null) {
       await _sendMessage(customText: '📷 [VIEW_ONCE_IMG]:${image.path}');
@@ -465,11 +485,69 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: Text(widget.userName),
+        title: InkWell(
+          onTap: () async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => UserProfileDetailScreen(
+                  userName: widget.userName,
+                  bio: 'Pengguna Clover',
+                  status: 'Online',
+                  distance: 'Di dekatmu',
+                ),
+              ),
+            );
+            _loadChatData();
+          },
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: CloverApp.primaryMint.withValues(alpha: 0.2),
+                child: Text(widget.userName[0], style: const TextStyle(color: CloverApp.primaryMint, fontSize: 14, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(widget.userName, style: const TextStyle(fontSize: 16), overflow: TextOverflow.ellipsis),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => UserProfileDetailScreen(
+                    userName: widget.userName,
+                    bio: 'Pengguna Clover',
+                    status: 'Online',
+                    distance: 'Di dekatmu',
+                  ),
+                ),
+              );
+              _loadChatData();
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
           children: [
+            if (_isBlocked)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                color: Colors.redAccent.withValues(alpha: 0.2),
+                child: const Text(
+                  'Pengguna ini telah Anda blokir.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                ),
+              ),
             Expanded(
               child: ListView.builder(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -537,10 +615,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                       ),
                       child: TextField(
                         controller: _msgController,
+                        enabled: !_isBlocked,
                         style: const TextStyle(color: Colors.white, fontSize: 14),
-                        decoration: const InputDecoration(
-                          hintText: 'Ketik pesan...',
-                          hintStyle: TextStyle(color: Colors.white38, fontSize: 14),
+                        decoration: InputDecoration(
+                          hintText: _isBlocked ? 'Pengguna diblokir...' : 'Ketik pesan...',
+                          hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
                           border: InputBorder.none,
                         ),
                       ),
@@ -549,7 +628,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                   const SizedBox(width: 6),
                   IconButton(
                     icon: const Icon(Icons.send_rounded, color: CloverApp.primaryMint),
-                    onPressed: () => _sendMessage(),
+                    onPressed: _isBlocked ? null : () => _sendMessage(),
                   ),
                 ],
               ),
@@ -589,6 +668,19 @@ class NearbyTab extends StatelessWidget {
               ),
               title: Text(user['name']!, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               subtitle: Text('${user['distance']} • ${user['bio']}', style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UserProfileDetailScreen(
+                      userName: user['name']!,
+                      bio: user['bio']!,
+                      status: user['status']!,
+                      distance: user['distance']!,
+                    ),
+                  ),
+                );
+              },
               trailing: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: CloverApp.myBubbleBg,
@@ -614,6 +706,199 @@ class NearbyTab extends StatelessWidget {
             ),
           );
         },
+      ),
+    );
+  }
+}
+
+class UserProfileDetailScreen extends StatefulWidget {
+  final String userName;
+  final String bio;
+  final String status;
+  final String distance;
+
+  const UserProfileDetailScreen({
+    super.key,
+    required this.userName,
+    required this.bio,
+    required this.status,
+    required this.distance,
+  });
+
+  @override
+  State<UserProfileDetailScreen> createState() => _UserProfileDetailScreenState();
+}
+
+class _UserProfileDetailScreenState extends State<UserProfileDetailScreen> {
+  bool _isBlocked = false;
+  bool _isFriend = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkStatus();
+  }
+
+  Future<void> _checkStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final blockedList = prefs.getStringList('blocked_users') ?? [];
+    final activeUsers = prefs.getStringList('active_chat_users') ?? ['Alex (Developer)'];
+
+    setState(() {
+      _isBlocked = blockedList.contains(widget.userName);
+      _isFriend = activeUsers.contains(widget.userName);
+    });
+  }
+
+  Future<void> _toggleBlock() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> blockedList = prefs.getStringList('blocked_users') ?? [];
+
+    if (_isBlocked) {
+      blockedList.remove(widget.userName);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${widget.userName} telah dibuka dari pemblokiran.')),
+      );
+    } else {
+      blockedList.add(widget.userName);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${widget.userName} telah diblokir.')),
+      );
+    }
+
+    await prefs.setStringList('blocked_users', blockedList);
+    setState(() {
+      _isBlocked = !_isBlocked;
+    });
+  }
+
+  Future<void> _removeFriend() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> activeUsers = prefs.getStringList('active_chat_users') ?? ['Alex (Developer)'];
+
+    if (activeUsers.contains(widget.userName)) {
+      activeUsers.remove(widget.userName);
+      await prefs.setStringList('active_chat_users', activeUsers);
+      setState(() {
+        _isFriend = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${widget.userName} telah dihapus dari pertemanan.')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Profil Pengguna'),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 50,
+                  backgroundColor: CloverApp.primaryMint.withValues(alpha: 0.2),
+                  child: Text(
+                    widget.userName[0].toUpperCase(),
+                    style: const TextStyle(fontSize: 40, color: CloverApp.primaryMint, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  widget.userName,
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: CloverApp.surfaceDark,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${widget.status} • ${widget.distance}',
+                    style: const TextStyle(color: CloverApp.primaryMint, fontSize: 12),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  widget.bio,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white70, fontSize: 14),
+                ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: CloverApp.primaryMint,
+                      foregroundColor: CloverApp.bgDark,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      List<String> activeUsers = prefs.getStringList('active_chat_users') ?? ['Alex (Developer)'];
+                      if (!activeUsers.contains(widget.userName)) {
+                        activeUsers.add(widget.userName);
+                        await prefs.setStringList('active_chat_users', activeUsers);
+                      }
+
+                      if (context.mounted) {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => ChatDetailScreen(userName: widget.userName)),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.chat),
+                    label: const Text('Kirim Pesan', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (_isFriend)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.orangeAccent,
+                        side: const BorderSide(color: Colors.orangeAccent),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: _removeFriend,
+                      icon: const Icon(Icons.person_remove),
+                      label: const Text('Hapus Pertemanan'),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _isBlocked ? Colors.grey[800] : Colors.redAccent.withValues(alpha: 0.2),
+                      foregroundColor: _isBlocked ? Colors.white : Colors.redAccent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _toggleBlock,
+                    icon: Icon(_isBlocked ? Icons.check_circle_outline : Icons.block),
+                    label: Text(_isBlocked ? 'Buka Pemblokiran' : 'Blokir Pengguna'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
